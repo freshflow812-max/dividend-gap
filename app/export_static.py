@@ -31,6 +31,7 @@ def build_page() -> str:
     css = (STATIC_DIR / "style.css").read_text(encoding="utf-8")
     js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
     return (
+        '<meta charset="utf-8">\n'
         f"{title}\n"
         '<meta name="claude:viewport-fit-sides" content="cover">\n'
         f"<style>\n{css}</style>\n"

@@ -128,6 +128,9 @@ def summarize(events: list[GapEvent]) -> dict:
         "avg_yield_pct": avg([e.div_yield_pct for e in events]),
         "closed_within": within,
         "open_now": n - len(closed),
+        # Период, за который посчитаны средние: первая и последняя отсечка с данными о ценах.
+        "first_ex_date": min((e.ex_date for e in events), default=None),
+        "last_ex_date": max((e.ex_date for e in events), default=None),
     }
 
 

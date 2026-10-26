@@ -132,3 +132,22 @@ td .sub { display: block; color: var(--muted); font-size: 12px; }
   }
   nav { order: 3; flex-basis: 100%; }
 }
+
+/* пояснения к заголовкам */
+.help-btn {
+  display: inline-grid; place-items: center;
+  width: 16px; height: 16px; padding: 0; margin-left: 2px; vertical-align: 1px;
+  border-radius: 50%; border: 1px solid var(--border);
+  background: var(--bg); color: var(--muted);
+  font-size: 10px; font-weight: 700; line-height: 1;
+}
+.help-btn:hover { color: var(--accent); border-color: var(--accent); }
+#help-pop {
+  position: fixed; z-index: 20; width: min(320px, calc(100vw - 16px));
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--text) 18%, transparent);
+  font-size: 13px; white-space: normal;
+}
+#help-pop p { margin: 4px 0 0; color: var(--text); }

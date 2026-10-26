@@ -108,3 +108,11 @@ def test_cum_day_t0_before_2013():
     ev = gap.compute_event(prices, "2013-04-11", 2.57)
     assert ev.cum_date == "2013-04-11"
     assert ev.ex_date == "2013-04-12"
+
+
+def test_summarize_period():
+    p = make_prices("2025-07-14", [100, 90, 101])
+    ev = gap.compute_event(p, "2025-07-15", 10)
+    s = gap.summarize([ev])
+    assert s["first_ex_date"] == s["last_ex_date"] == "2025-07-15"
+    assert gap.summarize([])["first_ex_date"] is None
