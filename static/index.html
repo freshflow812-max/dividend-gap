@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Дивидендный гэп</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Дивидендный гэп</h1>
+    <span class="muted" id="last-update"></span>
+  </div>
+  <nav>
+    <button class="tab active" data-view="upcoming">Ближайшие дивиденды</button>
+    <button class="tab" data-view="stats">Статистика закрытия</button>
+  </nav>
+  <button id="update-btn" class="secondary" title="Загрузить свежие дивиденды и котировки">Обновить данные</button>
+</header>
+
+<main>
+  <section id="view-upcoming" class="view">
+    <div class="filters">
+      <input type="search" id="up-search" placeholder="Тикер или название">
+      <select id="up-horizon">
+        <option value="30">30 дней</option>
+        <option value="90" selected>90 дней</option>
+        <option value="365">Год</option>
+        <option value="0">Все</option>
+      </select>
+      <label><input type="checkbox" id="up-forecast" checked> Прогнозы</label>
+    </div>
+    <div class="table-wrap">
+      <table id="up-table" class="sortable">
+        <thead><tr>
+          <th data-key="registry_date">Реестр</th>
+          <th data-key="cum_date_est" title="Последний день покупки (оценка: T+1, без учёта праздников)">Купить до ≈</th>
+          <th data-key="secid">Акция</th>
+          <th data-key="value" class="num">Дивиденд, ₽</th>
+          <th data-key="yield_pct" class="num">Доходность</th>
+          <th data-key="is_forecast">Статус</th>
+          <th data-key="stats.events" class="num" title="Отсечек в истории">Гэпов</th>
+          <th data-key="stats.close_rate" class="num">Закрыто</th>
+          <th data-key="stats.closed_within.30" class="num" title="Доля гэпов, закрытых за 30 календарных дней">≤ 30 дн</th>
+          <th data-key="stats.median_days" class="num" title="Медиана календарных дней до закрытия (по закрытым)">Медиана, дн</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-stats" class="view hidden">
+    <div class="cards" id="overall-cards"></div>
+    <div class="filters">
+      <input type="search" id="st-search" placeholder="Тикер или название">
+      <label>Мин. гэпов <input type="number" id="st-min" value="3" min="0" style="width:4em"></label>
+    </div>
+    <div class="table-wrap">
+      <table id="st-table" class="sortable">
+        <thead><tr>
+          <th data-key="secid">Акция</th>
+          <th data-key="sector">Сектор</th>
+          <th data-key="events" class="num">Гэпов</th>
+          <th data-key="close_rate" class="num">Закрыто</th>
+          <th data-key="closed_within.7" class="num">≤ 7 дн</th>
+          <th data-key="closed_within.30" class="num">≤ 30 дн</th>
+          <th data-key="closed_within.90" class="num">≤ 90 дн</th>
+          <th data-key="closed_within.365" class="num">≤ год</th>
+          <th data-key="median_days" class="num">Медиана, дн</th>
+          <th data-key="avg_gap_pct" class="num">Ср. гэп</th>
+          <th data-key="avg_yield_pct" class="num">Ср. дох.</th>
+          <th data-key="last_event.ex_date">Последний гэп</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-ticker" class="view hidden">
+    <button class="link" id="back-btn">← Назад</button>
+    <h2 id="tk-title"></h2>
+    <div class="cards" id="tk-cards"></div>
+    <div class="chart-box"><canvas id="tk-chart"></canvas></div>
+    <p class="muted" id="tk-splits"></p>
+    <h3>Предстоящие и прогнозные выплаты</h3>
+    <div class="table-wrap"><table id="tk-future"><thead><tr>
+      <th>Реестр</th><th>Купить до ≈</th><th class="num">Дивиденд, ₽</th><th>Период</th><th>Статус</th>
+    </tr></thead><tbody></tbody></table></div>
+    <h3>История гэпов</h3>
+    <div class="table-wrap"><table id="tk-events"><thead><tr>
+      <th>Реестр</th><th>Посл. день с див.</th><th class="num">Дивиденд, ₽</th><th class="num">Дох.</th>
+      <th class="num">Гэп</th><th class="num">Цена до</th><th>Закрыт</th><th class="num">Дней</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+
+<footer class="muted">
+  Дивиденды: dohod.ru · Котировки: MOEX ISS · Гэп закрыт, когда цена закрытия вернулась к закрытию последнего дня с дивидендом.
+  Цены скорректированы на сплиты. Не является инвестиционной рекомендацией.
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
