@@ -8,12 +8,14 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from . import dohod, moex
 from .config import DOHOD_DELAY_SEC, PRICE_WORKERS
 from .db import connect
 
 log = logging.getLogger("collector")
+MSK = ZoneInfo("Europe/Moscow")
 
 
 def update_universe(conn) -> list[str]:
@@ -93,7 +95,7 @@ def run(tickers: list[str] | None = None, skip_dividends: bool = False) -> None:
 
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_update', ?)",
-            (datetime.now().isoformat(timespec="seconds"),),
+            (datetime.now(MSK).isoformat(timespec="seconds"),),
         )
 
 

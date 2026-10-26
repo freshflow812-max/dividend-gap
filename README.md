@@ -50,8 +50,11 @@ uvicorn app.main:app --reload
 Сайт можно выгрузить без сервера, с данными на момент выгрузки, например для GitHub Pages:
 
 ```bash
-python -m app.export_static        # -> site/
+python -m app.export_static                             # -> site/ (страница + data/*.json)
+python -m app.export_static --single dividend-gap.html  # один файл, все данные внутри
 ```
+
+Однофайловую версию можно открыть двойным кликом, без сервера. Интернет нужен только для загрузки библиотеки графиков (Chart.js с cdnjs). Без него таблицы работают, а графика не будет.
 
 ## API
 

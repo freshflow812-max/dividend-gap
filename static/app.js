@@ -110,6 +110,12 @@ const staticPath = (path) =>
   path.startsWith("/api/ticker/") ? `data/ticker/${path.slice(12)}.json` : `data/${path.slice(5).split("?")[0]}.json`;
 
 async function api(path, opts) {
+  // Однофайловая версия: все данные встроены в страницу.
+  if (window.DIVGAP_DATA) {
+    const data = window.DIVGAP_DATA[staticPath(path)];
+    if (!data) throw new Error(`нет данных: ${path}`);
+    return data;
+  }
   const r = await fetch(STATIC ? staticPath(path) : path, opts);
   if (!r.ok) throw new Error(`${r.status} ${path}`);
   return r.json();
@@ -150,7 +156,7 @@ async function loadUpcoming() {
   const data = await api("/api/upcoming");
   state.upcoming = data.items;
   $("#last-update").textContent = data.last_update
-    ? `данные от ${fmtDate(data.last_update.slice(0, 10))} ${data.last_update.slice(11, 16)}`
+    ? `данные от ${fmtDate(data.last_update.slice(0, 10))} ${data.last_update.slice(11, 16)}${data.last_update.includes("+03:00") ? " МСК" : ""}`
     : "данных пока нет — нажмите «Обновить данные»";
   renderUpcoming();
 }
