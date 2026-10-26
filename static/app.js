@@ -22,8 +22,13 @@ function lastEventBadge(ev) {
   return `<span class="badge bad">открыт ${ev.days_open} дн, −${fmtNum(ev.remaining_pct, 1)}%</span>`;
 }
 
+// Статическая версия (python -m app.export_static) читает заранее выгруженные JSON вместо API.
+const STATIC = !!window.DIVGAP_STATIC;
+const staticPath = (path) =>
+  path.startsWith("/api/ticker/") ? `data/ticker/${path.slice(12)}.json` : `data/${path.slice(5).split("?")[0]}.json`;
+
 async function api(path, opts) {
-  const r = await fetch(path, opts);
+  const r = await fetch(STATIC ? staticPath(path) : path, opts);
   if (!r.ok) throw new Error(`${r.status} ${path}`);
   return r.json();
 }
@@ -264,6 +269,7 @@ document.addEventListener("click", (ev) => {
 setupSort("up-table", renderUpcoming);
 setupSort("st-table", renderStats);
 
+$("#update-btn").hidden = STATIC;
 $("#update-btn").addEventListener("click", async () => {
   const btn = $("#update-btn");
   btn.disabled = true;

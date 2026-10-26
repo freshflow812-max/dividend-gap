@@ -45,6 +45,14 @@ uvicorn app.main:app --reload
 30 19 * * 1-5  cd /path/to/dividend-gap && python -m app.collector
 ```
 
+## Статическая версия
+
+Сайт можно выгрузить без сервера, с данными на момент выгрузки, например для GitHub Pages:
+
+```bash
+python -m app.export_static        # -> site/
+```
+
 ## API
 
 | Метод | Описание |
