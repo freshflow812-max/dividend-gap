@@ -56,6 +56,17 @@ python -m app.export_static --single dividend-gap.html  # один файл, в�
 
 Однофайловую версию можно открыть двойным кликом, без сервера. Интернет нужен только для загрузки библиотеки графиков (Chart.js с cdnjs). Без него таблицы работают, а графика не будет.
 
+## Автообновление (GitHub Actions + Pages)
+
+Workflow `.github/workflows/update.yml` запускается по будням в 19:37 МСК (и вручную: Actions → «Обновление данных» → Run workflow). Он:
+
+1. собирает дивиденды и котировки; база хранится в кэше Actions, поэтому обновление инкрементальное;
+2. прогоняет тесты;
+3. публикует сайт на GitHub Pages: `https://<владелец>.github.io/dividend-gap/`;
+4. прикладывает однофайловую версию `dividend-gap.html` к запуску (Summary → Artifacts), а также кладёт её на сайт: `…/dividend-gap/dividend-gap.html`.
+
+Чтобы публикация заработала, один раз включите Pages: Settings → Pages → Build and deployment → Source: **GitHub Actions**. На бесплатном тарифе GitHub Pages работают только у публичных репозиториев.
+
 ## API
 
 | Метод | Описание |

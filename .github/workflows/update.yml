@@ -1,0 +1,75 @@
+# Ежедневный сбор дивидендов и котировок и публикация сайта на GitHub Pages.
+name: Обновление данных
+
+on:
+  schedule:
+    # По будням в 19:37 МСК (16:37 UTC): после закрытия основной сессии Мосбиржи.
+    - cron: "37 16 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      # База хранится в кэше Actions между запусками, поэтому котировки догружаются инкрементально.
+      # Если кэш пропал (GitHub удаляет неиспользуемые через 7 дней), база соберётся заново (~5 минут).
+      - uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: divgap-db-${{ github.run_id }}
+          restore-keys: divgap-db-
+
+      - name: Сбор данных
+        run: python -m app.collector
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data
+          key: divgap-db-${{ github.run_id }}
+
+      - name: Тесты
+        run: pip install pytest && python -m pytest -q
+
+      - name: Сборка сайта
+        run: |
+          python -m app.export_static --out _site --standalone
+          python -m app.export_static --single _site/dividend-gap.html
+
+      # Однофайловая версия доступна для скачивания на странице запуска (Summary → Artifacts).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dividend-gap-html
+          path: _site/dividend-gap.html
+          retention-days: 14
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

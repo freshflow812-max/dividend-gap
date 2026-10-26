@@ -1,6 +1,6 @@
 """Выгрузка статической версии сайта (без сервера) в папку site/.
 
-Запуск:  python -m app.export_static [--out site]
+Запуск:  python -m app.export_static [--out site] [--standalone]
          python -m app.export_static --single dividend-gap.html   # один файл со всеми данными
 
 Страница — фрагмент без <html>/<head>/<body>, CSS и JS встроены,
@@ -81,11 +81,11 @@ def collect() -> dict[str, object]:
     return files
 
 
-def export(out: Path) -> int:
+def export(out: Path, standalone: bool = False) -> int:
     files = collect()
     for rel, data in files.items():
         _dump(out / rel, data)
-    (out / "index.html").write_text(build_page(), encoding="utf-8")
+    (out / "index.html").write_text(build_page(standalone=standalone), encoding="utf-8")
     return len(files) - 2
 
 
@@ -100,11 +100,13 @@ def main():
     parser = argparse.ArgumentParser(description="Статическая версия сайта")
     parser.add_argument("--out", default=str(BASE_DIR / "site"))
     parser.add_argument("--single", help="Собрать один HTML-файл со встроенными данными по этому пути")
+    parser.add_argument("--standalone", action="store_true",
+                        help="index.html — полноценный документ (для GitHub Pages и другого хостинга)")
     args = parser.parse_args()
     if args.single:
         n, target = export_single(Path(args.single)), args.single
     else:
-        n, target = export(Path(args.out)), args.out
+        n, target = export(Path(args.out), args.standalone), args.out
     print(f"Готово: {n} бумаг -> {target}")
 
 
