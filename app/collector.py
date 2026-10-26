@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from . import dohod, moex
-from .config import DOHOD_DELAY_SEC, PRICE_WORKERS
+from .config import DOHOD_DELAY_SEC, INDEX_HISTORY_FROM, INDEXES, PRICE_WORKERS
 from .db import connect
 
 log = logging.getLogger("collector")
@@ -47,6 +47,8 @@ def price_start(conn, secid: str) -> str:
     last = conn.execute("SELECT MAX(date) FROM prices WHERE secid = ?", (secid,)).fetchone()[0]
     if last:
         return last  # перезаписываем последний день: он мог быть незавершённым
+    if secid in INDEXES:
+        return INDEX_HISTORY_FROM
     first_div = conn.execute("SELECT MIN(registry_date) FROM dividends WHERE secid = ?", (secid,)).fetchone()[0]
     start = date.fromisoformat(first_div) - timedelta(days=30) if first_div else date.today() - timedelta(days=365)
     return start.isoformat()
@@ -92,6 +94,15 @@ def run(tickers: list[str] | None = None, skip_dividends: bool = False) -> None:
                     log.info("[%d/%d] %s: свечей %d", n, len(universe), secid, len(rows))
                 except Exception:
                     log.exception("[%d/%d] %s: ошибка загрузки котировок", n, len(universe), secid)
+
+        for secid in INDEXES:
+            try:
+                rows = moex.index_history(secid, price_start(conn, secid))
+                save_prices(conn, secid, rows)
+                conn.commit()
+                log.info("Индекс %s: свечей %d", secid, len(rows))
+            except Exception:
+                log.exception("Индекс %s: ошибка загрузки", secid)
 
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_update', ?)",

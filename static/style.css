@@ -151,3 +151,12 @@ td .sub { display: block; color: var(--muted); font-size: 12px; }
   font-size: 13px; white-space: normal;
 }
 #help-pop p { margin: 4px 0 0; color: var(--text); }
+
+/* доходность */
+.range { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#pf-table th:first-child, #pf-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+#pf-table th:first-child { z-index: 2; }
+#pf-index td { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+#pf-index tr:last-child td { border-bottom: 2px solid var(--border); }
+td.up { color: var(--good); }
+td.down { color: var(--bad); }

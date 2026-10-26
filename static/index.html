@@ -16,6 +16,7 @@
   <nav>
     <button class="tab active" data-view="upcoming">Ближайшие дивиденды</button>
     <button class="tab" data-view="stats">Статистика закрытия</button>
+    <button class="tab" data-view="perf">Доходность</button>
   </nav>
   <button id="update-btn" class="secondary" title="Загрузить свежие дивиденды и котировки">Обновить данные</button>
 </header>
@@ -76,6 +77,35 @@
           <th data-key="last_event.ex_date" data-help="last_gap">Последний гэп</th>
         </tr></thead>
         <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-perf" class="view hidden">
+    <div class="filters">
+      <input type="search" id="pf-search" placeholder="Тикер или название">
+      <select id="pf-sector"><option value="">Все секторы</option></select>
+      <label><input type="checkbox" id="pf-divs"> С дивидендами <span data-help="pf_divs"></span></label>
+      <span class="range">
+        <label>Период с <input type="date" id="pf-from"></label>
+        <label>по <input type="date" id="pf-to"></label>
+      </span>
+    </div>
+    <p class="muted" id="pf-note">Загрузка котировок…</p>
+    <div class="table-wrap">
+      <table id="pf-table" class="sortable">
+        <thead><tr>
+          <th data-key="secid">Акция</th>
+          <th data-key="price" class="num" data-help="pf_price">Цена</th>
+          <th data-key="day" class="num" data-help="pf_day">День</th>
+          <th data-key="week" class="num" data-help="pf_week">Неделя</th>
+          <th data-key="month" class="num" data-help="pf_month">Месяц</th>
+          <th data-key="ytd" class="num" data-help="pf_ytd">С начала года</th>
+          <th data-key="year" class="num" data-help="pf_year">Год</th>
+          <th data-key="custom" class="num" data-help="pf_custom" id="pf-custom-th">Период</th>
+        </tr></thead>
+        <tbody id="pf-index"></tbody>
+        <tbody id="pf-body"></tbody>
       </table>
     </div>
   </section>

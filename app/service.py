@@ -2,7 +2,7 @@
 from datetime import date
 
 from . import gap, splits
-from .config import MANUAL_SPLITS
+from .config import INDEXES, MANUAL_SPLITS
 
 
 def securities(conn) -> dict[str, dict]:
@@ -51,7 +51,6 @@ def ticker_report(conn, secid: str) -> dict | None:
         "events": [e.to_dict() for e in reversed(events)],
         "dividends": dividends,
         "splits": [{"date": d, "factor": k} for d, k in split_list],
-        "prices": [[p["date"], round(p["close"], 6)] for p in prices],
     }
 
 
@@ -111,3 +110,38 @@ def build_all(conn, today: date | None = None) -> dict:
 def last_update(conn) -> str | None:
     row = conn.execute("SELECT value FROM meta WHERE key = 'last_update'").fetchone()
     return row[0] if row else None
+
+
+def encode_closes(prices: list[dict]) -> dict:
+    """Компактная запись ряда закрытий: первая дата, шаги в днях и цены."""
+    if not prices:
+        return {"t0": None, "dt": [], "c": []}
+    days = [date.fromisoformat(p["date"]) for p in prices]
+    return {
+        "t0": prices[0]["date"],
+        "dt": [0] + [(b - a).days for a, b in zip(days, days[1:])],
+        "c": [float(f"{p['close']:.6g}") for p in prices],
+    }
+
+
+def closes(conn) -> dict:
+    """Цены закрытия (с учётом сплитов) и даты дивидендов по всем бумагам и индексам.
+
+    Используется вкладкой «Доходность» и графиком в карточке акции.
+    """
+    result = {}
+    for secid, name in INDEXES.items():
+        prices, _ = load_prices(conn, secid)
+        result[secid] = {"name": name, "sector": "Индекс", "is_index": True, "divs": [], **encode_closes(prices)}
+    for secid, sec in securities(conn).items():
+        prices, _ = load_prices(conn, secid)
+        events = ticker_events(prices, load_dividends(conn, secid))
+        result[secid] = {
+            "name": sec["name"],
+            "sector": sec["sector"],
+            "is_index": False,
+            # Дивиденд «приходит» в ex-день: с него цена уже без дивиденда.
+            "divs": [[e.ex_date, e.value] for e in events],
+            **encode_closes(prices),
+        }
+    return result

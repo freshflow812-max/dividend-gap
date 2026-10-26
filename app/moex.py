@@ -19,8 +19,8 @@ def tqbr_securities() -> dict[str, str]:
     return {r["SECID"]: r["SHORTNAME"] for r in _rows(data["securities"])}
 
 
-def history(secid: str, date_from: str) -> list[dict]:
-    """Дневные свечи режима TQBR начиная с date_from (включительно).
+def history(secid: str, date_from: str, market: str = "shares", board: str = PRIMARY_BOARD) -> list[dict]:
+    """Дневные свечи начиная с date_from (включительно); по умолчанию акции в режиме TQBR.
 
     Свечи ISS по TQBR уже включают историю предшествующего режима EQBR
     и скорректированы на сплиты. Дни без сделок в свечах отсутствуют.
@@ -31,7 +31,7 @@ def history(secid: str, date_from: str) -> list[dict]:
     start = 0
     while True:
         data = get(
-            f"{ISS_URL}/engines/stock/markets/shares/boards/{PRIMARY_BOARD}/securities/{secid}/candles.json",
+            f"{ISS_URL}/engines/stock/markets/{market}/boards/{board}/securities/{secid}/candles.json",
             {"iss.meta": "off", "interval": 24, "from": date_from, "start": start},
         ).json()
         rows = _rows(data["candles"])
@@ -50,3 +50,8 @@ def history(secid: str, date_from: str) -> list[dict]:
             break
         start += len(rows)
     return result
+
+
+def index_history(secid: str, date_from: str) -> list[dict]:
+    """Дневные значения индекса Мосбиржи (режим SNDX)."""
+    return history(secid, date_from, market="index", board="SNDX")

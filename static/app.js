@@ -47,6 +47,14 @@ const HELP = {
   price_before: ["Цена до", "Цена закрытия последнего дня с дивидендом. Гэп закрыт, когда цена закрытия возвращается к этому уровню. Цены скорректированы на сплиты."],
   ev_closed: ["Закрыт", "Дата, когда цена закрытия впервые вернулась к уровню «Цена до». «Нет» — гэп ещё открыт; рядом показано, сколько процентов осталось до закрытия."],
   ev_days: ["Дней", "Календарных дней от дня гэпа до закрытия. Для открытого гэпа — сколько дней прошло на сегодня (со знаком «+»)."],
+  pf_price: ["Цена", "Последняя цена закрытия. За текущий день — цена на момент выгрузки данных (бесплатные данные Мосбиржи идут с задержкой 15 минут). Для индексов — значение индекса в пунктах."],
+  pf_day: ["День", "Изменение к закрытию предыдущего торгового дня."],
+  pf_week: ["Неделя", "Изменение к закрытию 7 календарных дней назад. Если в тот день торгов не было — к ближайшему торговому дню до него."],
+  pf_month: ["Месяц", "Изменение к закрытию месяц назад (или ближайшему торговому дню до этой даты)."],
+  pf_ytd: ["С начала года", "Изменение к закрытию последнего торгового дня прошлого года."],
+  pf_year: ["Год", "Изменение к закрытию год назад (или ближайшему торговому дню до этой даты)."],
+  pf_custom: ["Период", "Изменение от закрытия последнего торгового дня перед началом периода до закрытия последнего торгового дня периода. Даты задаются полями «Период с … по …»."],
+  pf_divs: ["С дивидендами", "Добавляет к росту цены дивиденды, по которым гэп пришёлся на выбранный период: (цена в конце + сумма дивидендов) ÷ цена в начале − 1. Дивиденды не реинвестируются, налог не вычитается. Индекс IMOEX считается без дивидендов, для сравнения с ними смотрите MCFTR — индекс полной доходности, где дивиденды уже учтены."],
   total_events: ["Всего гэпов", "Число отсечек по всем акциям, попавших в статистику."],
 };
 
@@ -301,9 +309,12 @@ function estimateCum(iso) {
   return d.toISOString().slice(0, 10);
 }
 
-function drawChart(r) {
+async function drawChart(r) {
   if (state.chart) state.chart.destroy();
+  state.chart = null;
   if (typeof Chart === "undefined") return;
+  const series = (await getCloses())[r.security.secid];
+  r.prices = series ? series.dates.map((d, i) => [d, series.closes[i]]) : [];
   const css = getComputedStyle(document.documentElement);
   const color = (v) => css.getPropertyValue(v).trim();
   const idx = new Map(r.prices.map((p, i) => [p[0], i]));
@@ -338,6 +349,130 @@ function drawChart(r) {
   });
 }
 
+
+// ---------- цены закрытия (общие для вкладки «Доходность» и графиков) ----------
+let closesPromise = null;
+function getCloses() {
+  if (!closesPromise) {
+    closesPromise = api("/api/closes").then((raw) => {
+      const out = {};
+      for (const [secid, s] of Object.entries(raw)) {
+        const dates = [];
+        let t = s.t0 ? Date.parse(s.t0 + "T00:00:00Z") : 0;
+        for (const dt of s.dt) {
+          t += dt * 864e5;
+          dates.push(new Date(t).toISOString().slice(0, 10));
+        }
+        out[secid] = { ...s, secid, dates, closes: s.c };
+      }
+      return out;
+    });
+    closesPromise.catch(() => (closesPromise = null));
+  }
+  return closesPromise;
+}
+
+// Индекс последней даты <= iso (или < iso при strict), -1 если такой нет.
+function idxOnOrBefore(dates, iso, strict = false) {
+  let lo = 0, hi = dates.length - 1, ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (strict ? dates[mid] < iso : dates[mid] <= iso) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans;
+}
+
+function shiftIso(iso, { days = 0, months = 0, years = 0 }) {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCFullYear(d.getUTCFullYear() + years, d.getUTCMonth() + months, d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// Доходность ряда между индексами base и end (в процентах), опционально с дивидендами.
+function periodReturn(s, base, end, withDivs) {
+  if (base < 0 || end < 0 || base >= end) return null;
+  let value = s.closes[end];
+  if (withDivs) {
+    const from = s.dates[base], to = s.dates[end];
+    for (const [ex, v] of s.divs) if (ex > from && ex <= to) value += v;
+  }
+  return (value / s.closes[base] - 1) * 100;
+}
+
+function perfRow(s, asOf, from, to, withDivs) {
+  const end = idxOnOrBefore(s.dates, asOf);
+  if (end < 0) return null;
+  const at = (iso) => idxOnOrBefore(s.dates, iso);
+  const yearStart = `${asOf.slice(0, 4)}-01-01`;
+  const cEnd = idxOnOrBefore(s.dates, to);
+  return {
+    secid: s.secid,
+    name: s.name,
+    sector: s.sector,
+    is_index: s.is_index,
+    last_date: s.dates[end],
+    price: s.closes[end],
+    day: periodReturn(s, end - 1, end, withDivs),
+    week: periodReturn(s, at(shiftIso(asOf, { days: -7 })), end, withDivs),
+    month: periodReturn(s, at(shiftIso(asOf, { months: -1 })), end, withDivs),
+    ytd: periodReturn(s, idxOnOrBefore(s.dates, yearStart, true), end, withDivs),
+    year: periodReturn(s, at(shiftIso(asOf, { years: -1 })), end, withDivs),
+    custom: from && to && from <= to ? periodReturn(s, idxOnOrBefore(s.dates, from, true), cEnd, withDivs) : null,
+  };
+}
+
+let perfData = null;
+async function loadPerf() {
+  if (!perfData) {
+    perfData = await getCloses();
+    const all = Object.values(perfData);
+    const asOf = all.reduce((m, s) => (s.dates.length && s.dates.at(-1) > m ? s.dates.at(-1) : m), "");
+    state.perfAsOf = asOf;
+    if (!$("#pf-to").value) $("#pf-to").value = asOf;
+    if (!$("#pf-from").value) $("#pf-from").value = shiftIso(asOf, { months: -3 });
+    const sectors = [...new Set(all.filter((s) => !s.is_index).map((s) => s.sector).filter(Boolean))].sort();
+    $("#pf-sector").insertAdjacentHTML("beforeend", sectors.map((x) => `<option>${esc(x)}</option>`).join(""));
+  }
+  renderPerf();
+}
+
+const pctCell = (v) =>
+  `<td class="num ${v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : ""}">${v == null ? "—" : (v > 0 ? "+" : "") + fmtNum(v, 2) + "%"}</td>`;
+
+function perfRowHtml(r) {
+  // Отстающая дата: бумага не торговалась или индекс ещё не рассчитан за последний день.
+  let lag = "";
+  if (r.last_date < shiftIso(state.perfAsOf, { days: -7 })) lag = ` · торги до ${fmtDate(r.last_date)}`;
+  else if (r.last_date !== state.perfAsOf) lag = ` · на ${fmtDate(r.last_date)}`;
+  const link = r.is_index ? "" : ` class="clickable" data-secid="${esc(r.secid)}"`;
+  return `<tr${link}>
+    <td><b>${esc(r.secid)}</b><span class="sub">${esc(r.name)}${lag}</span></td>
+    <td class="num">${r.is_index ? fmtNum(r.price, 2) : fmtValue(r.price)}</td>
+    ${["day", "week", "month", "ytd", "year", "custom"].map((k) => pctCell(r[k])).join("")}
+  </tr>`;
+}
+
+function renderPerf() {
+  if (!perfData) return;
+  const q = $("#pf-search").value.trim().toLowerCase();
+  const sector = $("#pf-sector").value;
+  const withDivs = $("#pf-divs").checked;
+  const from = $("#pf-from").value, to = $("#pf-to").value;
+  const asOf = state.perfAsOf;
+  const rows = Object.values(perfData).map((s) => perfRow(s, asOf, from, to, withDivs)).filter(Boolean);
+
+  $("#pf-index").innerHTML = rows.filter((r) => r.is_index).map(perfRowHtml).join("");
+  const stocks = sortRows("pf-table", rows.filter((r) => !r.is_index && matches(r, q) && (!sector || r.sector === sector)));
+  $("#pf-body").innerHTML =
+    stocks.map(perfRowHtml).join("") || `<tr><td colspan="8" class="muted">Нет акций по выбранным фильтрам</td></tr>`;
+
+  $("#pf-custom-th").firstChild.textContent = from && to ? `${fmtDate(from)} – ${fmtDate(to)} ` : "Период ";
+  $("#pf-note").textContent =
+    `Цены на ${fmtDate(asOf)}. ` +
+    (withDivs ? "Доходность с учётом дивидендов (без реинвестирования и налога). " : "Изменение цены без учёта дивидендов. ") +
+    `Акций: ${stocks.length}.`;
+}
+
 // ---------- навигация ----------
 function showView(name) {
   document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
@@ -350,6 +485,7 @@ document.querySelectorAll(".tab").forEach((t) =>
     history.replaceState(null, "", location.pathname);
     showView(t.dataset.view);
     if (t.dataset.view === "stats") loadStats();
+    if (t.dataset.view === "perf") loadPerf();
   })
 );
 $("#back-btn").addEventListener("click", () => {
@@ -365,6 +501,8 @@ document.addEventListener("click", (ev) => {
 decorateHelp();
 setupSort("up-table", renderUpcoming);
 setupSort("st-table", renderStats);
+setupSort("pf-table", renderPerf);
+["#pf-search", "#pf-sector", "#pf-divs", "#pf-from", "#pf-to"].forEach((sel) => $(sel).addEventListener("input", renderPerf));
 
 $("#update-btn").hidden = STATIC;
 $("#update-btn").addEventListener("click", async () => {
@@ -384,8 +522,14 @@ $("#update-btn").addEventListener("click", async () => {
   }, 5000);
 });
 
+const VIEWS = { upcoming: null, stats: loadStats, perf: loadPerf };
 function route() {
-  if (location.hash.length > 1) openTicker(decodeURIComponent(location.hash.slice(1)));
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (!h) return;
+  if (h in VIEWS) {
+    showView(h);
+    VIEWS[h]?.();
+  } else openTicker(h);
 }
 window.addEventListener("hashchange", route);
 

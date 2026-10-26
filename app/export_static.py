@@ -76,6 +76,7 @@ def collect() -> dict[str, object]:
             "today": data["today"], "last_update": data["last_update"],
             "overall": data["overall"], "tickers": data["tickers"],
         }
+        files["data/closes.json"] = service.closes(conn)
         for secid in service.securities(conn):
             files[f"data/ticker/{secid}.json"] = service.ticker_report(conn, secid)
     return files
@@ -86,14 +87,14 @@ def export(out: Path, standalone: bool = False) -> int:
     for rel, data in files.items():
         _dump(out / rel, data)
     (out / "index.html").write_text(build_page(standalone=standalone), encoding="utf-8")
-    return len(files) - 2
+    return len(files) - 3
 
 
 def export_single(path: Path) -> int:
     files = collect()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(build_page(embedded=files, standalone=True), encoding="utf-8")
-    return len(files) - 2
+    return len(files) - 3
 
 
 def main():

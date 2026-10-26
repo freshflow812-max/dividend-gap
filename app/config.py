@@ -11,6 +11,13 @@ USER_AGENT = "Mozilla/5.0 (dividend-gap collector)"
 # Основной режим торгов акциями.
 PRIMARY_BOARD = "TQBR"
 
+# Индексы для сравнения: SECID -> название. Котировки берутся с режима SNDX.
+INDEXES = {
+    "IMOEX": "Индекс МосБиржи",
+    "MCFTR": "Индекс МосБиржи полной доходности",
+}
+INDEX_HISTORY_FROM = "2003-01-01"
+
 # Пауза между запросами к dohod.ru, чтобы не нагружать сайт.
 DOHOD_DELAY_SEC = float(os.environ.get("DIVGAP_DOHOD_DELAY", "0.7"))
 

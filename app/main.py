@@ -51,6 +51,17 @@ def stats():
     }
 
 
+@app.get("/api/closes")
+def closes():
+    with connect() as conn:
+        key = service.last_update(conn)
+        with _cache_lock:
+            if _cache.get("closes_key") != key:
+                _cache["closes"] = service.closes(conn)
+                _cache["closes_key"] = key
+            return _cache["closes"]
+
+
 @app.get("/api/ticker/{secid}")
 def ticker(secid: str):
     with connect() as conn:
