@@ -63,8 +63,8 @@ Workflow `.github/workflows/update.yml` запускается по будням
 
 1. собирает дивиденды и котировки; база хранится в кэше Actions, поэтому обновление инкрементальное;
 2. прогоняет тесты;
-3. публикует сайт на GitHub Pages: `https://<владелец>.github.io/dividend-gap/`;
-4. прикладывает однофайловую версию `dividend-gap.html` к запуску (Summary → Artifacts), а также кладёт её на сайт: `…/dividend-gap/dividend-gap.html`.
+3. публикует сайт на GitHub Pages: `https://freshflow812-max.github.io/market-tools/`;
+4. прикладывает однофайловую версию `dividend-gap.html` к запуску (Summary → Artifacts), а также кладёт её на сайт: `…/market-tools/dividend-gap.html`.
 
 Чтобы публикация заработала, один раз включите Pages: Settings → Pages → Build and deployment → Source: **GitHub Actions**. На бесплатном тарифе GitHub Pages работают только у публичных репозиториев.
 
