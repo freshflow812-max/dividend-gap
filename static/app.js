@@ -324,12 +324,24 @@ async function drawChart(r) {
     if (idx.has(e.cum_date)) before[idx.get(e.cum_date)] = e.close_before;
     if (e.closed && idx.has(e.close_date)) closedAt[idx.get(e.close_date)] = series.closes[idx.get(e.close_date)];
   }
-  state.tk = { labels, close: series.closes, before, closedAt };
+  // Полосы «гэп открыт»: от ex-дня до дня закрытия (или до последней даты, если не закрыт).
+  const n = labels.length - 1;
+  const bands = r.events
+    .filter((e) => idx.has(e.ex_date))
+    .map((e) => ({
+      from: idx.get(e.ex_date),
+      to: e.closed ? idx.get(e.close_date) ?? n : n,
+      closed: e.closed,
+      days: e.closed ? e.days_to_close : e.days_open,
+    }))
+    .sort((a, b) => a.from - b.from); // слева направо — так работает проверка наложения подписей
+  state.tk = { labels, close: series.closes, before, closedAt, bands, lo: 0, hi: n };
 
   const css = getComputedStyle(document.documentElement);
   const color = (v) => css.getPropertyValue(v).trim();
   state.chart = new Chart($("#tk-chart"), {
     type: "line",
+    plugins: [gapBandsPlugin],
     data: {
       labels: [],
       datasets: [
@@ -342,7 +354,15 @@ async function drawChart(r) {
       maintainAspectRatio: false,
       animation: false,
       interaction: { mode: "index", intersect: false },
-      plugins: { legend: { labels: { color: color("--muted") } } },
+      plugins: {
+        // Легенда снизу: верх графика занят подписями дней над полосами.
+        legend: { position: "bottom", labels: { color: color("--muted") } },
+        gapBands: {
+          closedFill: color("--good-bg"), closedText: color("--good"),
+          openFill: color("--bad-bg"), openText: color("--bad"),
+        },
+      },
+      layout: { padding: { top: 22 } },
       scales: {
         x: { ticks: { color: color("--muted"), maxTicksLimit: 10 }, grid: { color: color("--border") } },
         y: { ticks: { color: color("--muted") }, grid: { color: color("--border") } },
@@ -350,12 +370,51 @@ async function drawChart(r) {
     },
   });
 
-  const n = labels.length - 1;
   for (const el of [$("#ch-lo"), $("#ch-hi")]) el.max = n;
   $("#ch-from").min = $("#ch-to").min = labels[0];
   $("#ch-from").max = $("#ch-to").max = labels[n];
   applyChartPreset(state.chartPreset || "3y");
 }
+
+
+// Закрашивает периоды от дня гэпа до его закрытия и подписывает число дней.
+const gapBandsPlugin = {
+  id: "gapBands",
+  beforeDatasetsDraw(chart, _args, opts) {
+    const tk = state.tk;
+    if (!tk || !tk.bands.length) return;
+    const { ctx, chartArea: area, scales: { x } } = chart;
+    const count = tk.hi - tk.lo + 1;
+    const step = count > 1 ? x.getPixelForValue(1) - x.getPixelForValue(0) : area.right - area.left;
+    const px = (i) => x.getPixelForValue(i - tk.lo);
+    ctx.save();
+    ctx.font = "11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    let lastLabelRight = -Infinity;
+    for (const b of tk.bands) {
+      if (b.to < tk.lo || b.from > tk.hi) continue;
+      const left = Math.max(area.left, px(Math.max(b.from, tk.lo)) - step / 2);
+      const right = Math.min(area.right, px(Math.min(b.to, tk.hi)) + step / 2);
+      ctx.fillStyle = b.closed ? opts.closedFill : opts.openFill;
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(left, area.top, Math.max(1, right - left), area.bottom - area.top);
+      ctx.globalAlpha = 1;
+      // Подпись над полосой; пропускаем, если налезает на предыдущую.
+      const text = b.closed ? `${b.days} дн` : `${b.days}+ дн`;
+      const w = ctx.measureText(text).width;
+      // Закрытый гэп подписываем по центру полосы, открытый — у дня гэпа: открытые полосы
+      // длинные и часто перекрывают друг друга.
+      const anchor = b.closed ? (left + right) / 2 : left + w / 2 + 2;
+      const cx = Math.min(Math.max(anchor, area.left + w / 2), area.right - w / 2);
+      if (cx - w / 2 < lastLabelRight + 4) continue;
+      ctx.fillStyle = b.closed ? opts.closedText : opts.openText;
+      ctx.fillText(text, cx, area.top - 3);
+      lastLabelRight = cx + w / 2;
+    }
+    ctx.restore();
+  },
+};
 
 // ---------- период графика ----------
 const CHART_PRESETS = { "1m": { months: -1 }, "3m": { months: -3 }, "6m": { months: -6 }, "1y": { years: -1 }, "3y": { years: -3 }, "5y": { years: -5 } };
@@ -386,6 +445,8 @@ function setChartRange(lo, hi, preset = null) {
   c.data.datasets[0].data = tk.close.slice(lo, hi + 1);
   c.data.datasets[1].data = tk.before.slice(lo, hi + 1);
   c.data.datasets[2].data = tk.closedAt.slice(lo, hi + 1);
+  tk.lo = lo;
+  tk.hi = hi;
   c.update("none");
 
   $("#ch-lo").value = lo;

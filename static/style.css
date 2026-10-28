@@ -188,3 +188,8 @@ td.down { color: var(--bad); }
 .dual-range input[type=range]::-moz-range-track { background: none; }
 .dual-range input[type=range]:focus-visible { outline: none; }
 .dual-range input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
+
+.chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin: 8px 0 0; }
+.swatch { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-left: 6px; }
+.swatch.closed { background: var(--good-bg); border: 1px solid var(--good); }
+.swatch.open { background: var(--bad-bg); border: 1px solid var(--bad); }
