@@ -32,6 +32,22 @@ def update_universe(conn) -> list[str]:
     return [i["secid"] for i in items]
 
 
+def update_free_floats(conn) -> None:
+    """Обновляет коэффициенты free-float. Ошибка не критична: остаются прошлые значения."""
+    try:
+        ff = moex.free_floats()
+    except Exception:
+        log.exception("Free-float: ошибка загрузки, оставляем прежние значения")
+        return
+    conn.execute("DELETE FROM free_float")
+    conn.executemany(
+        "INSERT INTO free_float (secid, value, approve_date) VALUES (?, ?, ?)",
+        [(secid, value, day) for secid, (value, day) in ff.items()],
+    )
+    conn.commit()
+    log.info("Free-float: %d бумаг", len(ff))
+
+
 def update_dividends(conn, secid: str) -> int:
     divs = dohod.fetch_dividends(secid)
     conn.execute("DELETE FROM dividends WHERE secid = ?", (secid,))
@@ -66,6 +82,7 @@ def run(tickers: list[str] | None = None, skip_dividends: bool = False) -> None:
     with connect() as conn:
         universe = update_universe(conn)
         conn.commit()
+        update_free_floats(conn)
         if tickers:
             universe = [t for t in universe if t in tickers]
 

@@ -12,6 +12,7 @@
 | Что | Откуда |
 |---|---|
 | Дивиденды: история, объявленные, прогнозы | [dohod.ru](https://www.dohod.ru/ik/analytics/dividend), парсинг HTML |
+| Коэффициенты free-float | [moex.com](https://www.moex.com/ru/listing/free-float.aspx), API страницы листинга (недокументированный) |
 | Дневные котировки (TQBR), индексы IMOEX, MCFTR и отраслевые индексы | [MOEX ISS](https://iss.moex.com/iss/reference/), публичный API |
 
 В ISS тоже был список дивидендов (`/securities/{ticker}/dividends`), но теперь этот метод их не отдаёт. Поэтому дивиденды берутся с dohod.ru.

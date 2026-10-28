@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS prices (
     PRIMARY KEY (secid, date)
 );
 
+CREATE TABLE IF NOT EXISTS free_float (
+    secid        TEXT PRIMARY KEY,
+    value        REAL NOT NULL,   -- доля акций в свободном обращении, 0..1
+    approve_date TEXT             -- дата утверждения коэффициента Мосбиржей
+);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT

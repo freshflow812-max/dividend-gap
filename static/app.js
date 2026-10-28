@@ -56,6 +56,7 @@ const HELP = {
   pf_custom: ["Период", "Изменение от закрытия последнего торгового дня перед началом периода до закрытия последнего торгового дня периода. Даты задаются полями «Период с … по …»."],
   pf_divs: ["С дивидендами", "Добавляет к росту цены дивиденды, по которым гэп пришёлся на выбранный период: (цена в конце + сумма дивидендов) ÷ цена в начале − 1. Дивиденды не реинвестируются, налог не вычитается. Индекс IMOEX и отраслевые индексы считаются без дивидендов, для сравнения с ними смотрите MCFTR — индекс полной доходности, где дивиденды уже учтены."],
   pf_sectors: ["Отраслевые индексы", "Индексы Мосбиржи по отраслям: нефть и газ, электроэнергетика, финансы, металлы и добыча, химия, потребительский сектор, транспорт, ИТ и телекоммуникации, недвижимость. Считаются по цене, без дивидендов. Если выбрать сектор в фильтре, индекс этой отрасли закрепится вверху таблицы рядом с IMOEX. В режиме «Отраслевые индексы» клик по строке показывает акции этого сектора."],
+  ff: ["Free-float", "Доля акций в свободном обращении — та часть, которая реально торгуется на бирже, без пакетов крупных владельцев, государства и менеджмента. Коэффициент рассчитывает и утверждает Мосбиржа (дата утверждения — в карточке акции). Низкий free-float означает, что крупный покупатель или продавец сильнее двигает цену. «—» — Мосбиржа не публикует коэффициент для этой бумаги."],
   total_events: ["Всего гэпов", "Число отсечек по всем акциям, попавших в статистику."],
 };
 
@@ -272,6 +273,12 @@ async function openTicker(secid) {
     ["Медиана, торг. дн", s.median_trading_days ?? "—", "median_trading_days"],
     ["Средний гэп", fmtPct(s.avg_gap_pct, 2), "avg_gap", `за ${yearRange(s)}`],
     ["Средняя доходность", fmtPct(s.avg_yield_pct, 2), "avg_yield", `за ${yearRange(s)}`],
+    [
+      "Free-float",
+      r.security.free_float == null ? "—" : fmtPct(r.security.free_float * 100, 0),
+      "ff",
+      r.security.free_float_date ? `утв. ${fmtDate(r.security.free_float_date)}` : "не публикуется",
+    ],
   ]);
   $("#tk-splits").textContent = r.splits.length
     ? "Учтены сплиты/консолидации: " + r.splits.map((x) => `${fmtDate(x.date)} (×${x.factor >= 1 ? x.factor : "1/" + Math.round(1 / x.factor)})`).join(", ")
@@ -542,6 +549,7 @@ function perfRow(s, asOf, from, to, withDivs) {
     sector: s.sector,
     is_index: s.is_index,
     group: s.group,
+    ff: s.is_index ? null : s.ff ?? null,
     sectors: s.sectors || [],
     last_date: s.dates[end],
     price: s.closes[end],
@@ -584,6 +592,7 @@ function perfRowHtml(r) {
   return `<tr${link}>
     <td><b>${esc(r.secid)}</b><span class="sub">${esc(r.name)}${esc(sectors)}${lag}</span></td>
     <td class="num">${r.is_index ? fmtNum(r.price, 2) : fmtValue(r.price)}</td>
+    <td class="num">${r.is_index ? "" : r.ff == null ? "—" : fmtNum(r.ff * 100, 0) + "%"}</td>
     ${["day", "week", "month", "ytd", "year", "custom"].map((k) => pctCell(r[k])).join("")}
   </tr>`;
 }
@@ -611,7 +620,7 @@ function renderPerf() {
     : rows.filter((r) => !r.is_index && matches(r, q) && (!sector || r.sector === sector));
   const sorted = sortRows("pf-table", body);
   $("#pf-body").innerHTML =
-    sorted.map(perfRowHtml).join("") || `<tr><td colspan="8" class="muted">Ничего не найдено по выбранным фильтрам</td></tr>`;
+    sorted.map(perfRowHtml).join("") || `<tr><td colspan="9" class="muted">Ничего не найдено по выбранным фильтрам</td></tr>`;
 
   $("#pf-custom-th").firstChild.textContent = from && to ? `${fmtDate(from)} – ${fmtDate(to)} ` : "Период ";
   $("#pf-note").textContent =

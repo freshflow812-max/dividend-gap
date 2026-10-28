@@ -5,6 +5,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = Path(os.environ.get("DIVGAP_DB", BASE_DIR / "data" / "divgap.sqlite"))
 
 ISS_URL = "https://iss.moex.com/iss"
+# Коэффициенты free-float: в ISS их нет, берём из API, которым пользуется страница
+# https://www.moex.com/ru/listing/free-float.aspx (публичный, но не документированный).
+FREE_FLOAT_URL = "https://web.moex.com/moex-web-icdb-api/api/v1/site-free-floats"
 DOHOD_URL = "https://www.dohod.ru/ik/analytics/dividend"
 USER_AGENT = "Mozilla/5.0 (dividend-gap collector)"
 

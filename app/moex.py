@@ -1,7 +1,7 @@
 """Котировки с MOEX ISS (бесплатный публичный API Мосбиржи)."""
 from datetime import date
 
-from .config import ISS_URL, PRIMARY_BOARD
+from .config import FREE_FLOAT_URL, ISS_URL, PRIMARY_BOARD
 from .http import get
 
 
@@ -55,3 +55,19 @@ def history(secid: str, date_from: str, market: str = "shares", board: str = PRI
 def index_history(secid: str, date_from: str) -> list[dict]:
     """Дневные значения индекса Мосбиржи (режим SNDX)."""
     return history(secid, date_from, market="index", board="SNDX")
+
+
+def free_floats() -> dict[str, tuple[float, str | None]]:
+    """Коэффициенты free-float, которые публикует Мосбиржа: {SECID: (доля 0..1, дата утверждения ISO)}.
+
+    Мосбиржа рассчитывает их только для части бумаг (в основном из индексной базы).
+    """
+    data = get(FREE_FLOAT_URL, {"pageNumber": 0, "pageSize": 1000}).json()
+    result = {}
+    for r in data["list"]:
+        if r.get("freeFloat") is None or not r.get("tradeCode"):
+            continue
+        d = r.get("approveDate")  # ДД.ММ.ГГГГ
+        iso = f"{d[6:10]}-{d[3:5]}-{d[0:2]}" if d and len(d) == 10 else None
+        result[r["tradeCode"]] = (float(r["freeFloat"]), iso)
+    return result

@@ -6,7 +6,11 @@ from .config import INDEXES, MANUAL_SPLITS, SECTOR_INDEXES
 
 
 def securities(conn) -> dict[str, dict]:
-    return {r["secid"]: dict(r) for r in conn.execute("SELECT * FROM securities ORDER BY secid")}
+    """Бумаги с дивидендами; free_float — доля 0..1 или None, если Мосбиржа его не публикует."""
+    return {r["secid"]: dict(r) for r in conn.execute(
+        "SELECT s.*, f.value AS free_float, f.approve_date AS free_float_date "
+        "FROM securities s LEFT JOIN free_float f ON f.secid = s.secid ORDER BY s.secid"
+    )}
 
 
 def load_prices(conn, secid: str) -> tuple[list[dict], list[tuple[str, float]]]:
@@ -151,6 +155,7 @@ def closes(conn) -> dict:
             "name": sec["name"],
             "sector": sec["sector"],
             "is_index": False,
+            "ff": sec["free_float"],
             # Дивиденд «приходит» в ex-день: с него цена уже без дивиденда.
             "divs": [[e.ex_date, e.value] for e in events],
             **encode_closes(prices),
