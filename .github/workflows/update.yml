@@ -9,6 +9,11 @@ on:
     # и индекс полной доходности MCFTR, который Мосбиржа публикует только после окончания торгов.
     - cron: "37 3 * * 2-6"
   workflow_dispatch:
+    inputs:
+      dividends:
+        description: "Обновить и дивиденды с dohod.ru (дольше; без галочки — только котировки и сайт)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,6 +27,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Обычно сборка занимает 3–5 минут; если источник данных завис — прерываем, а не ждём 6 часов.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -39,8 +46,18 @@ jobs:
           key: divgap-db-${{ github.run_id }}
           restore-keys: divgap-db-
 
+      # Дивиденды с dohod.ru собираем вечером по расписанию и при ручном запуске с галочкой.
+      # Утренний запуск и обычный ручной обновляют только котировки — так быстрее и меньше нагрузка на dohod.ru.
       - name: Сбор данных
-        run: python -m app.collector
+        timeout-minutes: 20
+        env:
+          SKIP_DIVIDENDS: ${{ (github.event_name == 'workflow_dispatch' && !inputs.dividends) || github.event.schedule == '37 3 * * 2-6' }}
+        run: |
+          if [ "$SKIP_DIVIDENDS" = "true" ]; then
+            python -m app.collector --skip-dividends
+          else
+            python -m app.collector
+          fi
 
       - uses: actions/cache/save@v4
         if: always()

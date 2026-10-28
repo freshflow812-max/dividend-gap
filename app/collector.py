@@ -87,15 +87,21 @@ def run(tickers: list[str] | None = None, skip_dividends: bool = False) -> None:
             universe = [t for t in universe if t in tickers]
 
         # Дивиденды — последовательно и с паузой, чтобы не нагружать dohod.ru.
-        if not skip_dividends:
-            for n, secid in enumerate(universe, 1):
+        # С --skip-dividends всё равно загружаем их для новых бумаг: от первой выплаты
+        # зависит, с какой даты качать историю котировок.
+        div_targets = universe
+        if skip_dividends:
+            have = {r[0] for r in conn.execute("SELECT DISTINCT secid FROM dividends")}
+            div_targets = [t for t in universe if t not in have]
+        if div_targets:
+            for n, secid in enumerate(div_targets, 1):
                 try:
                     ndiv = update_dividends(conn, secid)
                     conn.commit()
-                    log.info("[%d/%d] %s: дивидендов %d", n, len(universe), secid, ndiv)
+                    log.info("[%d/%d] %s: дивидендов %d", n, len(div_targets), secid, ndiv)
                 except Exception:
                     conn.rollback()
-                    log.exception("[%d/%d] %s: ошибка загрузки дивидендов", n, len(universe), secid)
+                    log.exception("[%d/%d] %s: ошибка загрузки дивидендов", n, len(div_targets), secid)
                 time.sleep(DOHOD_DELAY_SEC)
 
         # Котировки — параллельно; запись в базу только из этого потока.
