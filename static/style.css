@@ -196,15 +196,18 @@ td.down { color: var(--bad); }
 #pf-table tbody tr:hover td:first-child { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
 .tr-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .cagr-box {
-  position: absolute; top: 34px; right: 22px; z-index: 1;
+  position: absolute; top: 34px; left: 70px; z-index: 1;
   display: grid; grid-template-columns: auto auto; gap: 0 10px; align-items: baseline;
-  padding: 6px 10px; border-radius: 8px; font-size: 12px; pointer-events: none;
+  padding: 6px 10px; border-radius: 8px; font-size: 12px;
   background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
 }
-.cagr-box .ttl { grid-column: 1 / -1; color: var(--muted); }
+.cagr-box.dragging { cursor: grabbing; box-shadow: 0 4px 16px color-mix(in srgb, var(--text) 18%, transparent); }
+.cagr-box .ttl { grid-column: 1 / -1; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.cagr-box .grip { letter-spacing: -2px; opacity: .7; }
 .cagr-box .v { text-align: right; font-weight: 600; }
 .cagr-box .tr { color: var(--tr); }
 @media (max-width: 640px) {
-  .cagr-box { top: 30px; right: 8px; padding: 3px 6px; font-size: 10px; gap: 0 6px; }
+  .cagr-box { padding: 3px 6px; font-size: 10px; gap: 0 6px; }
 }

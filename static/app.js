@@ -537,11 +537,71 @@ function renderCagr(from, to, p0, p1, tr0, tr1) {
   const rate = (a, b) => ((annual ? Math.pow(b / a, 1 / years) : b / a) - 1) * 100;
   const span = annual ? `${fmtNum(years, 1)} г.` : `${Math.round(years * 365.25)} дн.`;
   box.innerHTML =
-    `<span class="ttl">${annual ? "CAGR" : "Доходность"} за ${span}</span>` +
+    `<span class="ttl"><span>${annual ? "CAGR" : "Доходность"} за ${span}</span><span class="grip" aria-hidden="true">⋮⋮</span></span>` +
     `<span class="tr">с дивидендами</span><span class="v tr">${signedPct(rate(tr0, tr1))}</span>` +
     `<span>цена</span><span class="v">${signedPct(rate(p0, p1))}</span>`;
   box.hidden = false;
+  placeCagr();
 }
+
+// Положение плашки: по умолчанию — левый верхний угол области графика (у оси цены).
+// Перетащенную позицию храним долями ширины/высоты, чтобы она переживала смену размера окна.
+const CAGR_POS_KEY = "divgap.cagrPos";
+let cagrPos = null;
+try {
+  cagrPos = JSON.parse(localStorage.getItem(CAGR_POS_KEY));
+} catch {
+  cagrPos = null;
+}
+
+function moveCagr(x, y) {
+  const box = $("#ch-cagr"), host = box.parentElement;
+  box.style.left = `${Math.max(0, Math.min(x, host.clientWidth - box.offsetWidth))}px`;
+  box.style.top = `${Math.max(0, Math.min(y, host.clientHeight - box.offsetHeight))}px`;
+}
+
+function placeCagr() {
+  const box = $("#ch-cagr"), host = box.parentElement;
+  if (box.hidden) return;
+  if (cagrPos) return moveCagr(cagrPos.fx * host.clientWidth, cagrPos.fy * host.clientHeight);
+  // Холст сдвинут внутри .chart-box на её отступ (12px).
+  const area = state.chart?.chartArea, pad = 12;
+  moveCagr((area ? area.left : 50) + pad + 8, (area ? area.top : 22) + pad + 6);
+}
+
+(function setupCagrDrag() {
+  const box = $("#ch-cagr");
+  let drag = null;
+  box.addEventListener("pointerdown", (e) => {
+    drag = { px: e.clientX, py: e.clientY, x: box.offsetLeft, y: box.offsetTop };
+    box.setPointerCapture(e.pointerId);
+    box.classList.add("dragging");
+    e.preventDefault();
+  });
+  box.addEventListener("pointermove", (e) => {
+    if (drag) moveCagr(drag.x + e.clientX - drag.px, drag.y + e.clientY - drag.py);
+  });
+  const finish = () => {
+    if (!drag) return;
+    drag = null;
+    box.classList.remove("dragging");
+    const host = box.parentElement;
+    cagrPos = { fx: box.offsetLeft / host.clientWidth, fy: box.offsetTop / host.clientHeight };
+    try {
+      localStorage.setItem(CAGR_POS_KEY, JSON.stringify(cagrPos));
+    } catch {}
+  };
+  box.addEventListener("pointerup", finish);
+  box.addEventListener("pointercancel", finish);
+  box.addEventListener("dblclick", () => {
+    cagrPos = null;
+    try {
+      localStorage.removeItem(CAGR_POS_KEY);
+    } catch {}
+    placeCagr();
+  });
+  window.addEventListener("resize", placeCagr);
+})();
 
 function syncTR(on) {
   state.showTR = on;
