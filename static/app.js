@@ -524,6 +524,25 @@ function chartTooltipFooter(items) {
   return `С ${fmtDate(tk.labels[tk.lo])}: цена ${signedPct(price)}, с дивидендами ${signedPct(total)}`;
 }
 
+// Плашка в углу графика: среднегодовая доходность (CAGR) за видимый период.
+// Короче года годовой пересчёт сильно искажает картину — тогда показываем доходность за период.
+function renderCagr(from, to, p0, p1, tr0, tr1) {
+  const box = $("#ch-cagr");
+  const years = (Date.parse(to) - Date.parse(from)) / (365.25 * 864e5);
+  if (!(years > 0) || !(p0 > 0)) {
+    box.hidden = true;
+    return;
+  }
+  const annual = years >= 0.98; // пресет «1 год» — 365 дней, а не 365,25
+  const rate = (a, b) => ((annual ? Math.pow(b / a, 1 / years) : b / a) - 1) * 100;
+  const span = annual ? `${fmtNum(years, 1)} г.` : `${Math.round(years * 365.25)} дн.`;
+  box.innerHTML =
+    `<span class="ttl">${annual ? "CAGR" : "Доходность"} за ${span}</span>` +
+    `<span class="tr">с дивидендами</span><span class="v tr">${signedPct(rate(tr0, tr1))}</span>` +
+    `<span>цена</span><span class="v">${signedPct(rate(p0, p1))}</span>`;
+  box.hidden = false;
+}
+
 function syncTR(on) {
   state.showTR = on;
   $("#ch-tr").checked = on;
@@ -570,6 +589,7 @@ function setChartRange(lo, hi, preset = null) {
   const tr = [tk.close[lo]];
   for (let i = lo + 1; i <= hi; i++) tr.push(tr[tr.length - 1] * tk.trFactor[i]);
   c.data.datasets[3].data = tr;
+  renderCagr(tk.labels[lo], tk.labels[hi], tk.close[lo], tk.close[hi], tr[0], tr[tr.length - 1]);
   tk.lo = lo;
   tk.hi = hi;
   c.update("none");

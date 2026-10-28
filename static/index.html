@@ -136,7 +136,10 @@
         <label>по <input type="date" id="ch-to"></label>
       </span>
     </div>
-    <div class="chart-box"><canvas id="tk-chart"></canvas></div>
+    <div class="chart-box">
+      <canvas id="tk-chart"></canvas>
+      <div class="cagr-box" id="ch-cagr" aria-live="polite" hidden></div>
+    </div>
     <div class="dual-range" id="ch-slider">
       <div class="dual-track"><div class="dual-fill" id="ch-fill"></div></div>
       <input type="range" id="ch-lo" min="0" max="0" value="0" aria-label="Начало периода">
