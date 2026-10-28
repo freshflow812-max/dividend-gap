@@ -11,6 +11,7 @@
   --good-bg: #dcfce7;
   --bad-bg: #fee2e2;
   --warn-bg: #fef3c7;
+  --tr: #7c3aed;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -26,6 +27,7 @@
     --good-bg: #14361f;
     --bad-bg: #3f1717;
     --warn-bg: #3a2f0b;
+    --tr: #c4b5fd;
     color-scheme: dark;
   }
 }
@@ -42,6 +44,7 @@
     --good-bg: #14361f;
     --bad-bg: #3f1717;
     --warn-bg: #3a2f0b;
+    --tr: #c4b5fd;
     color-scheme: dark;
 }
 
@@ -191,3 +194,4 @@ td.down { color: var(--bad); }
 
 .chart-hint { font-size: 12px; margin: 8px 0 0; }
 #pf-table tbody tr:hover td:first-child { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.tr-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }

@@ -57,6 +57,7 @@ const HELP = {
   pf_divs: ["С дивидендами", "Добавляет к росту цены дивиденды, по которым гэп пришёлся на выбранный период: (цена в конце + сумма дивидендов) ÷ цена в начале − 1. Дивиденды не реинвестируются, налог не вычитается. Индекс IMOEX и отраслевые индексы считаются без дивидендов, для сравнения с ними смотрите MCFTR — индекс полной доходности, где дивиденды уже учтены."],
   pf_sectors: ["Отраслевые индексы", "Индексы Мосбиржи по отраслям: нефть и газ, электроэнергетика, финансы, металлы и добыча, химия, потребительский сектор, транспорт, ИТ и телекоммуникации, недвижимость. Считаются по цене, без дивидендов. Если выбрать сектор в фильтре, индекс этой отрасли закрепится вверху таблицы рядом с IMOEX. В режиме «Отраслевые индексы» клик по строке показывает акции этого сектора."],
   ff: ["Free-float", "Доля акций в свободном обращении — та часть, которая реально торгуется на бирже, без пакетов крупных владельцев, государства и менеджмента. Коэффициент рассчитывает и утверждает Мосбиржа (дата утверждения — в карточке акции). Низкий free-float означает, что крупный покупатель или продавец сильнее двигает цену. «—» — Мосбиржа не публикует коэффициент для этой бумаги."],
+  ch_tr: ["Полная доходность", "Как росли бы вложения, если каждый дивиденд в день гэпа сразу покупать на эту же акцию. Линия начинается с цены в начале выбранного на графике периода, поэтому расстояние между ней и ценой показывает, сколько добавили дивиденды. Налог и комиссии не учитываются."],
   total_events: ["Всего гэпов", "Число отсечек по всем акциям, попавших в статистику."],
 };
 
@@ -343,7 +344,17 @@ async function drawChart(r) {
       days: e.closed ? e.days_to_close : e.days_open,
     }))
     .sort((a, b) => a.from - b.from); // слева направо — так работает проверка наложения подписей
-  state.tk = { labels, close: series.closes, before, closedAt, bands, lo: 0, hi: n };
+  // События по индексу дня — для подсказки при наведении.
+  const evAt = new Map(), closeAt = new Map();
+  for (const e of r.events) {
+    if (idx.has(e.cum_date)) evAt.set(idx.get(e.cum_date), e);
+    if (e.closed && idx.has(e.close_date)) closeAt.set(idx.get(e.close_date), e);
+  }
+  // Полная доходность: дневной множитель (цена + дивиденд в ex-день) / цена накануне.
+  const divOn = new Map();
+  for (const [ex, v] of series.divs) divOn.set(ex, (divOn.get(ex) || 0) + v);
+  const trFactor = labels.map((d, i) => (i ? (series.closes[i] + (divOn.get(d) || 0)) / series.closes[i - 1] : 1));
+  state.tk = { labels, close: series.closes, before, closedAt, bands, evAt, closeAt, trFactor, lo: 0, hi: n };
 
   const css = getComputedStyle(document.documentElement);
   const color = (v) => css.getPropertyValue(v).trim();
@@ -356,6 +367,10 @@ async function drawChart(r) {
         { label: "Цена закрытия", data: [], borderColor: color("--accent"), borderWidth: 1.5, pointRadius: 0, pointStyle: "line", tension: 0 },
         { label: "Последний день с дивидендом", data: [], showLine: false, pointRadius: 4, pointStyle: "circle", pointBackgroundColor: color("--warn"), borderColor: color("--warn") },
         { label: "День закрытия гэпа", data: [], showLine: false, pointRadius: 5, pointStyle: "triangle", pointBackgroundColor: color("--good"), borderColor: color("--good") },
+        {
+          label: "Полная доходность", data: [], borderColor: color("--tr"), borderWidth: 1.5,
+          pointRadius: 0, pointStyle: "line", tension: 0, hidden: !state.showTR,
+        },
       ],
     },
     options: {
@@ -396,12 +411,17 @@ async function drawChart(r) {
             },
           },
           onClick(e, item, legend) {
-            if (!item.bandKind) return Chart.defaults.plugins.legend.onClick.call(this, e, item, legend);
+            if (!item.bandKind) {
+              Chart.defaults.plugins.legend.onClick.call(this, e, item, legend);
+              if (item.datasetIndex === 3) syncTR(legend.chart.isDatasetVisible(3));
+              return;
+            }
             const opts = legend.chart.options.plugins.gapBands;
             opts.hidden[item.bandKind] = !opts.hidden[item.bandKind];
             legend.chart.update("none");
           },
         },
+        tooltip: { callbacks: { title: (items) => fmtDate(items[0]?.label), label: chartTooltipLabel, footer: chartTooltipFooter } },
         gapBands: {
           closedFill: color("--good-bg"), closedText: color("--good"),
           openFill: color("--bad-bg"), openText: color("--bad"),
@@ -470,6 +490,53 @@ const gapBandsPlugin = {
   },
 };
 
+// ---------- подсказка и полная доходность ----------
+const signedPct = (v) => (v > 0 ? "+" : "") + fmtNum(v, 2) + "%";
+
+function chartTooltipLabel(ctx) {
+  const tk = state.tk;
+  const gi = tk.lo + ctx.dataIndex;
+  if (ctx.datasetIndex === 1) {
+    const e = tk.evAt.get(gi);
+    if (!e) return null;
+    return [
+      `Последний день с дивидендом: ${fmtValue(e.close_before)} ₽`,
+      `Дивиденд: ${fmtValue(e.value)} ₽, доходность ${fmtPct(e.div_yield_pct, 2)}`,
+      `Гэп: ${fmtPct(e.gap_pct, 2)}, ${e.closed ? `закрыт за ${e.days_to_close} дн` : `не закрыт (${e.days_open}+ дн)`}`,
+    ];
+  }
+  if (ctx.datasetIndex === 2) {
+    const e = tk.closeAt.get(gi);
+    return e ? `Гэп закрыт за ${e.days_to_close} дн (дивиденд ${fmtValue(e.value)} ₽, реестр ${fmtDate(e.registry_date)})` : null;
+  }
+  if (ctx.datasetIndex === 3) return `Полная доходность: ${fmtValue(ctx.parsed.y)}`;
+  return `Цена: ${fmtValue(ctx.parsed.y)} ₽`;
+}
+
+// С включённой полной доходностью — сравнение с началом окна: цена и цена с дивидендами.
+function chartTooltipFooter(items) {
+  const c = state.chart, tk = state.tk;
+  if (!items.length || !c.isDatasetVisible(3)) return "";
+  const i = items[0].dataIndex;
+  const p0 = c.data.datasets[0].data[0], tr = c.data.datasets[3].data;
+  const price = (c.data.datasets[0].data[i] / p0 - 1) * 100;
+  const total = (tr[i] / tr[0] - 1) * 100;
+  return `С ${fmtDate(tk.labels[tk.lo])}: цена ${signedPct(price)}, с дивидендами ${signedPct(total)}`;
+}
+
+function syncTR(on) {
+  state.showTR = on;
+  $("#ch-tr").checked = on;
+}
+
+$("#ch-tr").addEventListener("change", () => {
+  syncTR($("#ch-tr").checked);
+  if (state.chart) {
+    state.chart.setDatasetVisibility(3, state.showTR);
+    state.chart.update("none");
+  }
+});
+
 // ---------- период графика ----------
 const CHART_PRESETS = { "1m": { months: -1 }, "3m": { months: -3 }, "6m": { months: -6 }, "1y": { years: -1 }, "3y": { years: -3 }, "5y": { years: -5 } };
 
@@ -499,6 +566,10 @@ function setChartRange(lo, hi, preset = null) {
   c.data.datasets[0].data = tk.close.slice(lo, hi + 1);
   c.data.datasets[1].data = tk.before.slice(lo, hi + 1);
   c.data.datasets[2].data = tk.closedAt.slice(lo, hi + 1);
+  // Полная доходность от начала окна: стартует с той же цены, что и график цены.
+  const tr = [tk.close[lo]];
+  for (let i = lo + 1; i <= hi; i++) tr.push(tr[tr.length - 1] * tk.trFactor[i]);
+  c.data.datasets[3].data = tr;
   tk.lo = lo;
   tk.hi = hi;
   c.update("none");
