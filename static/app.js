@@ -312,28 +312,30 @@ function estimateCum(iso) {
 async function drawChart(r) {
   if (state.chart) state.chart.destroy();
   state.chart = null;
+  state.tk = null;
   if (typeof Chart === "undefined") return;
   const series = (await getCloses())[r.security.secid];
-  r.prices = series ? series.dates.map((d, i) => [d, series.closes[i]]) : [];
-  const css = getComputedStyle(document.documentElement);
-  const color = (v) => css.getPropertyValue(v).trim();
-  const idx = new Map(r.prices.map((p, i) => [p[0], i]));
-  const labels = r.prices.map((p) => p[0]);
-  const close = r.prices.map((p) => p[1]);
+  if (!series || !series.dates.length) return;
+  const labels = series.dates;
+  const idx = new Map(labels.map((d, i) => [d, i]));
   const before = Array(labels.length).fill(null);
   const closedAt = Array(labels.length).fill(null);
   for (const e of r.events) {
     if (idx.has(e.cum_date)) before[idx.get(e.cum_date)] = e.close_before;
-    if (e.closed && idx.has(e.close_date)) closedAt[idx.get(e.close_date)] = r.prices[idx.get(e.close_date)][1];
+    if (e.closed && idx.has(e.close_date)) closedAt[idx.get(e.close_date)] = series.closes[idx.get(e.close_date)];
   }
+  state.tk = { labels, close: series.closes, before, closedAt };
+
+  const css = getComputedStyle(document.documentElement);
+  const color = (v) => css.getPropertyValue(v).trim();
   state.chart = new Chart($("#tk-chart"), {
     type: "line",
     data: {
-      labels,
+      labels: [],
       datasets: [
-        { label: "Цена закрытия", data: close, borderColor: color("--accent"), borderWidth: 1.5, pointRadius: 0, tension: 0 },
-        { label: "Последний день с дивидендом", data: before, showLine: false, pointRadius: 4, pointBackgroundColor: color("--warn"), borderColor: color("--warn") },
-        { label: "Гэп закрыт", data: closedAt, showLine: false, pointRadius: 4, pointStyle: "triangle", pointBackgroundColor: color("--good"), borderColor: color("--good") },
+        { label: "Цена закрытия", data: [], borderColor: color("--accent"), borderWidth: 1.5, pointRadius: 0, tension: 0 },
+        { label: "Последний день с дивидендом", data: [], showLine: false, pointRadius: 4, pointBackgroundColor: color("--warn"), borderColor: color("--warn") },
+        { label: "Гэп закрыт", data: [], showLine: false, pointRadius: 4, pointStyle: "triangle", pointBackgroundColor: color("--good"), borderColor: color("--good") },
       ],
     },
     options: {
@@ -347,8 +349,75 @@ async function drawChart(r) {
       },
     },
   });
+
+  const n = labels.length - 1;
+  for (const el of [$("#ch-lo"), $("#ch-hi")]) el.max = n;
+  $("#ch-from").min = $("#ch-to").min = labels[0];
+  $("#ch-from").max = $("#ch-to").max = labels[n];
+  applyChartPreset(state.chartPreset || "3y");
 }
 
+// ---------- период графика ----------
+const CHART_PRESETS = { "1m": { months: -1 }, "3m": { months: -3 }, "6m": { months: -6 }, "1y": { years: -1 }, "3y": { years: -3 }, "5y": { years: -5 } };
+
+function applyChartPreset(preset) {
+  const tk = state.tk;
+  if (!tk) return;
+  const n = tk.labels.length - 1;
+  const lo = preset === "all" ? 0 : Math.max(0, idxOnOrBefore(tk.labels, shiftIso(tk.labels[n], CHART_PRESETS[preset])));
+  state.chartPreset = preset;
+  setChartRange(lo, n, preset);
+}
+
+// Показывает на графике точки с lo по hi включительно; ось цены подстраивается под отрезок.
+function setChartRange(lo, hi, preset = null) {
+  const tk = state.tk;
+  if (!tk || !state.chart) return;
+  const n = tk.labels.length - 1;
+  lo = Math.max(0, Math.min(lo, n));
+  hi = Math.max(0, Math.min(hi, n));
+  if (hi - lo < 5) {
+    // Не даём сжать окно меньше недели торгов.
+    if (lo + 5 <= n) hi = lo + 5;
+    else lo = Math.max(0, hi - 5);
+  }
+  const c = state.chart;
+  c.data.labels = tk.labels.slice(lo, hi + 1);
+  c.data.datasets[0].data = tk.close.slice(lo, hi + 1);
+  c.data.datasets[1].data = tk.before.slice(lo, hi + 1);
+  c.data.datasets[2].data = tk.closedAt.slice(lo, hi + 1);
+  c.update("none");
+
+  $("#ch-lo").value = lo;
+  $("#ch-hi").value = hi;
+  $("#ch-from").value = tk.labels[lo];
+  $("#ch-to").value = tk.labels[hi];
+  $("#ch-fill").style.left = `${(lo / Math.max(n, 1)) * 100}%`;
+  $("#ch-fill").style.right = `${100 - (hi / Math.max(n, 1)) * 100}%`;
+  document.querySelectorAll("#ch-controls [data-range]").forEach((b) => b.classList.toggle("active", b.dataset.range === preset));
+}
+
+document.querySelectorAll("#ch-controls [data-range]").forEach((b) =>
+  b.addEventListener("click", () => applyChartPreset(b.dataset.range))
+);
+$("#ch-lo").addEventListener("input", () => {
+  const lo = +$("#ch-lo").value, hi = +$("#ch-hi").value;
+  setChartRange(Math.min(lo, hi - 5), hi);
+});
+$("#ch-hi").addEventListener("input", () => {
+  const lo = +$("#ch-lo").value, hi = +$("#ch-hi").value;
+  setChartRange(lo, Math.max(hi, lo + 5));
+});
+for (const id of ["#ch-from", "#ch-to"]) {
+  $(id).addEventListener("change", () => {
+    const tk = state.tk;
+    if (!tk) return;
+    const from = $("#ch-from").value, to = $("#ch-to").value;
+    if (!from || !to || from > to) return;
+    // Первый торговый день не раньше «с» и последний не позже «по».
+    setChartRange(idxOnOrBefore(tk.labels, from, true) + 1, idxOnOrBefore(tk.labels, to));
+  });
+}
 
 // ---------- цены закрытия (общие для вкладки «Доходность» и графиков) ----------
 let closesPromise = null;
