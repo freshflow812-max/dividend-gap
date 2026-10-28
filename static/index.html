@@ -83,8 +83,13 @@
 
   <section id="view-perf" class="view hidden">
     <div class="filters">
+      <select id="pf-show" aria-label="Что показывать">
+        <option value="stocks">Акции</option>
+        <option value="sectors">Отраслевые индексы</option>
+      </select>
       <input type="search" id="pf-search" placeholder="Тикер или название">
       <select id="pf-sector"><option value="">Все секторы</option></select>
+      <span data-help="pf_sectors"></span>
       <label><input type="checkbox" id="pf-divs"> С дивидендами <span data-help="pf_divs"></span></label>
       <span class="range">
         <label>Период с <input type="date" id="pf-from"></label>

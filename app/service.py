@@ -2,7 +2,7 @@
 from datetime import date
 
 from . import gap, splits
-from .config import INDEXES, MANUAL_SPLITS
+from .config import INDEXES, MANUAL_SPLITS, SECTOR_INDEXES
 
 
 def securities(conn) -> dict[str, dict]:
@@ -132,7 +132,18 @@ def closes(conn) -> dict:
     result = {}
     for secid, name in INDEXES.items():
         prices, _ = load_prices(conn, secid)
-        result[secid] = {"name": name, "sector": "Индекс", "is_index": True, "divs": [], **encode_closes(prices)}
+        result[secid] = {
+            "name": name, "sector": "Индекс", "is_index": True, "group": "broad", "divs": [],
+            **encode_closes(prices),
+        }
+    for secid, (name, sectors) in SECTOR_INDEXES.items():
+        prices, _ = load_prices(conn, secid)
+        if not prices:
+            continue
+        result[secid] = {
+            "name": name, "sector": "Отраслевой индекс", "is_index": True, "group": "sector",
+            "sectors": sectors, "divs": [], **encode_closes(prices),
+        }
     for secid, sec in securities(conn).items():
         prices, _ = load_prices(conn, secid)
         events = ticker_events(prices, load_dividends(conn, secid))
