@@ -353,9 +353,9 @@ async function drawChart(r) {
     data: {
       labels: [],
       datasets: [
-        { label: "Цена закрытия", data: [], borderColor: color("--accent"), borderWidth: 1.5, pointRadius: 0, tension: 0 },
-        { label: "Последний день с дивидендом", data: [], showLine: false, pointRadius: 4, pointBackgroundColor: color("--warn"), borderColor: color("--warn") },
-        { label: "Гэп закрыт", data: [], showLine: false, pointRadius: 4, pointStyle: "triangle", pointBackgroundColor: color("--good"), borderColor: color("--good") },
+        { label: "Цена закрытия", data: [], borderColor: color("--accent"), borderWidth: 1.5, pointRadius: 0, pointStyle: "line", tension: 0 },
+        { label: "Последний день с дивидендом", data: [], showLine: false, pointRadius: 4, pointStyle: "circle", pointBackgroundColor: color("--warn"), borderColor: color("--warn") },
+        { label: "День закрытия гэпа", data: [], showLine: false, pointRadius: 5, pointStyle: "triangle", pointBackgroundColor: color("--good"), borderColor: color("--good") },
       ],
     },
     options: {
@@ -364,10 +364,38 @@ async function drawChart(r) {
       interaction: { mode: "index", intersect: false },
       plugins: {
         // Легенда снизу: верх графика занят подписями дней над полосами.
-        legend: { position: "bottom", labels: { color: color("--muted") } },
+        legend: {
+          position: "bottom",
+          labels: {
+            color: color("--muted"),
+            // Значки в легенде как на графике: линия, кружок, треугольник, полосы.
+            usePointStyle: true,
+            boxWidth: 10,
+            boxHeight: 10,
+            generateLabels(chart) {
+              const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              const opts = chart.options.plugins.gapBands;
+              const band = (text, kind, fill, stroke) => ({
+                text, bandKind: kind, hidden: opts.hidden[kind], pointStyle: "rect",
+                fillStyle: fill, strokeStyle: stroke, lineWidth: 1, fontColor: color("--muted"),
+              });
+              return items.concat(
+                band("Гэп закрыт: дней до закрытия", "closed", opts.closedFill, opts.closedText),
+                band("Гэп ещё открыт", "open", opts.openFill, opts.openText)
+              );
+            },
+          },
+          onClick(e, item, legend) {
+            if (!item.bandKind) return Chart.defaults.plugins.legend.onClick.call(this, e, item, legend);
+            const opts = legend.chart.options.plugins.gapBands;
+            opts.hidden[item.bandKind] = !opts.hidden[item.bandKind];
+            legend.chart.update("none");
+          },
+        },
         gapBands: {
           closedFill: color("--good-bg"), closedText: color("--good"),
           openFill: color("--bad-bg"), openText: color("--bad"),
+          hidden: { closed: false, open: false },
         },
       },
       layout: { padding: { top: 22 } },
@@ -401,7 +429,7 @@ const gapBandsPlugin = {
     ctx.textBaseline = "bottom";
     let lastLabelRight = -Infinity;
     for (const b of tk.bands) {
-      if (b.to < tk.lo || b.from > tk.hi) continue;
+      if (b.to < tk.lo || b.from > tk.hi || opts.hidden[b.closed ? "closed" : "open"]) continue;
       const left = Math.max(area.left, px(Math.max(b.from, tk.lo)) - step / 2);
       const right = Math.min(area.right, px(Math.min(b.to, tk.hi)) + step / 2);
       ctx.fillStyle = b.closed ? opts.closedFill : opts.openFill;
