@@ -379,10 +379,20 @@ async function drawChart(r) {
                 text, bandKind: kind, hidden: opts.hidden[kind], pointStyle: "rect",
                 fillStyle: fill, strokeStyle: stroke, lineWidth: 1, fontColor: color("--muted"),
               });
-              return items.concat(
-                band("Гэп закрыт: дней до закрытия", "closed", opts.closedFill, opts.closedText),
-                band("Гэп ещё открыт", "open", opts.openFill, opts.openText)
-              );
+              // Скрытый пункт не зачёркиваем (так рисует Chart.js при hidden), а делаем бледным.
+              return items
+                .concat(
+                  band("Гэп закрыт: дней до закрытия", "closed", opts.closedFill, opts.closedText),
+                  band("Гэп ещё открыт", "open", opts.openFill, opts.openText)
+                )
+                .map((it) => {
+                  if (!it.hidden) return it;
+                  return {
+                    ...it, hidden: false,
+                    fontColor: fade(color("--muted"), 0.45),
+                    fillStyle: fade(it.fillStyle, 0.3), strokeStyle: fade(it.strokeStyle, 0.3),
+                  };
+                });
             },
           },
           onClick(e, item, legend) {
@@ -412,6 +422,14 @@ async function drawChart(r) {
   applyChartPreset(state.chartPreset || "3y");
 }
 
+
+// Цвет #rrggbb (как в токенах темы) с прозрачностью — для бледных пунктов легенды.
+function fade(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 // Закрашивает периоды от дня гэпа до его закрытия и подписывает число дней.
 const gapBandsPlugin = {
